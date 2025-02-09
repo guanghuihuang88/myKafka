@@ -91,8 +91,9 @@ class SocketServer(val config: KafkaConfig, val metrics: Metrics, val time: Time
       // 如：hadoop1:9092,hadoop1:9093,hadoop1:9094
       endpoints.values.foreach { endpoint =>
         val protocol = endpoint.protocolType  // 如：ACL、SSAL
+        // 默认config.numNetworkThreads=3
         val processorEndIndex = processorBeginIndex + numProcessorThreads
-
+        // 默认创建3个processor线程，这3个线程在new Acceptor的构造函数中启动（一般在搭建kafka集群的时候去配置这个参数）
         for (i <- processorBeginIndex until processorEndIndex)
           processors(i) = newProcessor(i, connectionQuotas, protocol)
         // 核心线程
@@ -246,6 +247,7 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
   val serverChannel = openServerSocket(endPoint.host, endPoint.port)
 
   this.synchronized {
+    // 启动3个processor线程
     processors.foreach { processor =>
       Utils.newThread("kafka-network-thread-%d-%s-%d".format(brokerId, endPoint.protocolType.toString, processor.id), processor, false).start()
     }
@@ -279,9 +281,10 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
                 val key = iter.next
                 iter.remove()
                 // 如果是客户端发送的网络连接请求
-                if (key.isAcceptable)
+                if (key.isAcceptable) {
+                  // processors（线程1、2、3）轮流分配处理
                   accept(key, processors(currentProcessor))
-                else
+                } else
                   throw new IllegalStateException("Unrecognized key state for acceptor thread.")
 
                 // round robin to the next processor thread
@@ -338,6 +341,7 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
    * Accept a new connection
    */
   def accept(key: SelectionKey, processor: Processor) {
+    // 根据SelectionKey获取到serverSocketChannel
     val serverSocketChannel = key.channel().asInstanceOf[ServerSocketChannel]
     val socketChannel = serverSocketChannel.accept()
     try {
@@ -352,7 +356,7 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
             .format(socketChannel.socket.getRemoteSocketAddress, socketChannel.socket.getLocalSocketAddress, processor.id,
                   socketChannel.socket.getSendBufferSize, sendBufferSize,
                   socketChannel.socket.getReceiveBufferSize, recvBufferSize))
-
+      // processor调用accept方法对socketChannel进行处理
       processor.accept(socketChannel)
     } catch {
       case e: TooManyConnectionsException =>
@@ -542,6 +546,7 @@ private[kafka] class Processor(val id: Int,
    * Queue up a new connection for reading
    */
   def accept(socketChannel: SocketChannel) {
+    // 把socketChannel存入processor自己的队列
     newConnections.add(socketChannel)
     wakeup()
   }
