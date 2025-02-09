@@ -178,6 +178,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = SystemTime, threadNamePr
    */
   def startup() {
     try {
+      // 整个kafka服务端的功能
       info("starting")
 
       if(isShuttingDown.get)
@@ -215,6 +216,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = SystemTime, threadNamePr
 
         metadataCache = new MetadataCache(config.brokerId)
 
+        // NIO的服务端
         socketServer = new SocketServer(config, metrics, kafkaMetricsTime)
         socketServer.startup()
 

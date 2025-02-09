@@ -80,22 +80,26 @@ class SocketServer(val config: KafkaConfig, val metrics: Metrics, val time: Time
     this.synchronized {
 
       connectionQuotas = new ConnectionQuotas(maxConnectionsPerIp, maxConnectionsPerIpOverrides)
-
+      // 接收和发送 请求的时候一些缓存的大小
       val sendBufferSize = config.socketSendBufferBytes
       val recvBufferSize = config.socketReceiveBufferBytes
+      // 当前broker主机的id
       val brokerId = config.brokerId
 
       var processorBeginIndex = 0
+      // 配置kafka的时候，config/server.properties中可以配置多个endpoint，即 主机:端口号（但一般一个机器只配置一个server实例）
+      // 如：hadoop1:9092,hadoop1:9093,hadoop1:9094
       endpoints.values.foreach { endpoint =>
-        val protocol = endpoint.protocolType
+        val protocol = endpoint.protocolType  // 如：ACL、SSAL
         val processorEndIndex = processorBeginIndex + numProcessorThreads
 
         for (i <- processorBeginIndex until processorEndIndex)
           processors(i) = newProcessor(i, connectionQuotas, protocol)
-
+        // 核心线程
         val acceptor = new Acceptor(endpoint, sendBufferSize, recvBufferSize, brokerId,
           processors.slice(processorBeginIndex, processorEndIndex), connectionQuotas)
         acceptors.put(endpoint, acceptor)
+        // Kafka自己封装了一个工具类，用来新建一个线程
         Utils.newThread("kafka-socket-acceptor-%s-%d".format(protocol.toString, endpoint.port), acceptor, false).start()
         acceptor.awaitStartup()
 
@@ -251,10 +255,19 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
    * Accept loop that checks for new connection attempts
    */
   def run() {
+    /**
+     * Kafka:
+     *    NIO 网络的通信
+     *    客户端：
+     *    服务端：serverChannel
+     *    服务端启动，客户端发送过来的请求，服务端对请求进行处理，服务端给客户端发送响应
+     *    客户端接收到响应后 -> 下一个请求的发送
+     */
     serverChannel.register(nioSelector, SelectionKey.OP_ACCEPT)
     startupComplete()
     try {
       var currentProcessor = 0
+      // 循环监听是否有事件注册
       while (isRunning) {
         try {
           val ready = nioSelector.select(500)
@@ -265,6 +278,7 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
               try {
                 val key = iter.next
                 iter.remove()
+                // 如果是客户端发送的网络连接请求
                 if (key.isAcceptable)
                   accept(key, processors(currentProcessor))
                 else
@@ -303,6 +317,8 @@ private[kafka] class Acceptor(val endPoint: EndPoint,
         new InetSocketAddress(port)
       else
         new InetSocketAddress(host, port)
+
+    // 启动一个Java NIO服务端
     val serverChannel = ServerSocketChannel.open()
     serverChannel.configureBlocking(false)
     if (recvBufferSize != Selectable.USE_DEFAULT_BUFFER_SIZE)
