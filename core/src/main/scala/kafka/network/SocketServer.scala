@@ -430,11 +430,15 @@ private[kafka] class Processor(val id: Int,
     while (isRunning) {
       try {
         // setup any new connections that have been queued up
+        // 读取每个SocketChannel，把每个SocketChannel都往Selector上面注册OP_READ事件
         configureNewConnections()
         // register any new responses for writing
         processNewResponses()
+        // 读取和发送请求的代码都在这个方法完成
         poll()
+        // 用来处理接收到达的请求
         processCompletedReceives()
+        // 用来处理发送出去的响应
         processCompletedSends()
         processDisconnected()
       } catch {
@@ -504,11 +508,13 @@ private[kafka] class Processor(val id: Int,
   }
 
   private def processCompletedReceives() {
+    // 遍历每一个请求
     selector.completedReceives.asScala.foreach { receive =>
       try {
         val channel = selector.channel(receive.source)
         val session = RequestChannel.Session(new KafkaPrincipal(KafkaPrincipal.USER_TYPE, channel.principal.getName),
           channel.socketAddress)
+        // 对于获取到的请求按照协议进行解析
         val req = RequestChannel.Request(processor = id, connectionId = receive.source, session = session, buffer = receive.payload, startTimeMs = time.milliseconds, securityProtocol = protocol)
         requestChannel.sendRequest(req)
         selector.mute(receive.source)
@@ -556,9 +562,11 @@ private[kafka] class Processor(val id: Int,
    */
   private def configureNewConnections() {
     while (!newConnections.isEmpty) {
+      // 不断获取连接队列里面的SocketChannel
       val channel = newConnections.poll()
       try {
         debug(s"Processor $id listening to new connection from ${channel.socket.getRemoteSocketAddress}")
+        // 解析，获取SocketChannel里面的各种参数
         val localHost = channel.socket().getLocalAddress.getHostAddress
         val localPort = channel.socket().getLocalPort
         val remoteHost = channel.socket().getInetAddress.getHostAddress
