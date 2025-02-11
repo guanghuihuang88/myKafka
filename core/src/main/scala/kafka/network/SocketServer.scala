@@ -433,6 +433,7 @@ private[kafka] class Processor(val id: Int,
         // 读取每个SocketChannel，把每个SocketChannel都往Selector上面注册OP_READ事件
         configureNewConnections()
         // register any new responses for writing
+        // 处理响应
         processNewResponses()
         // 读取和发送请求的代码都在这个方法完成
         poll()
@@ -458,6 +459,7 @@ private[kafka] class Processor(val id: Int,
   }
 
   private def processNewResponses() {
+    // 根据Processor线程编号获取对应的响应队列
     var curr = requestChannel.receiveResponse(id)
     while (curr != null) {
       try {

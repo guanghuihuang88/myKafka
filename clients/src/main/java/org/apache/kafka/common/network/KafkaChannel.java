@@ -86,6 +86,7 @@ public class KafkaChannel {
     }
 
     public void unmute() {
+        // 重新监听OP_READ事件
         transportLayer.addInterestOps(SelectionKey.OP_READ);
     }
 
@@ -122,6 +123,7 @@ public class KafkaChannel {
         if (this.send != null)
             throw new IllegalStateException("Attempt to begin a send operation with prior send operation still in progress.");
         this.send = send;
+        // 发送完响应后，监听OP_WRITE事件
         this.transportLayer.addInterestOps(SelectionKey.OP_WRITE);
     }
 
