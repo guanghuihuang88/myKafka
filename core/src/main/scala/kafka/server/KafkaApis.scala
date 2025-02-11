@@ -75,6 +75,7 @@ class KafkaApis(val requestChannel: RequestChannel,
       trace("Handling request:%s from connection %s;securityProtocol:%s,principal:%s".
         format(request.requestDesc(true), request.connectionId, request.securityProtocol, request.session.principal))
       ApiKeys.forId(request.requestId) match {
+        //
         case ApiKeys.PRODUCE => handleProducerRequest(request)
         case ApiKeys.FETCH => handleFetchRequest(request)
         case ApiKeys.LIST_OFFSETS => handleOffsetRequest(request)
@@ -347,13 +348,17 @@ class KafkaApis(val requestChannel: RequestChannel,
    * Handle a produce request
    */
   def handleProducerRequest(request: RequestChannel.Request) {
+    // 获取生产者发送的请求信息
     val produceRequest = request.body.asInstanceOf[ProduceRequest]
     val numBytesAppended = request.header.sizeOf + produceRequest.sizeOf
-
+    // 按照分区的方式遍历数据（因为生产者客户端那边也是针对每个分区，封装一批数据作为一个请求发送给broker）
+    // existingAndAuthorizedForDescribeTopics：对应topic存在且有权限（正常情况）
+    // nonExistingOrUnauthorizedForDescribeTopics：对应topic不存在或没权限（不正常的情况）
+    // partition：这是 Scala 集合的一个方法，它接受一个函数作为参数，该函数用于判断集合中的每个元素是否满足特定条件。partition 方法会返回一个元组，元组的第一个元素是满足条件的元素组成的集合，第二个元素是不满足条件的元素组成的集合
     val (existingAndAuthorizedForDescribeTopics, nonExistingOrUnauthorizedForDescribeTopics) = produceRequest.partitionRecords.asScala.partition {
       case (topicPartition, _) => authorize(request.session, Describe, new Resource(auth.Topic, topicPartition.topic)) && metadataCache.contains(topicPartition.topic)
     }
-
+    // 同样的语法再次获取有写权限的tp，放入authorizedRequestInfo
     val (authorizedRequestInfo, unauthorizedForWriteRequestInfo) = existingAndAuthorizedForDescribeTopics.partition {
       case (topicPartition, _) => authorize(request.session, Write, new Resource(auth.Topic, topicPartition.topic))
     }
@@ -381,6 +386,8 @@ class KafkaApis(val requestChannel: RequestChannel,
       }
 
       def produceResponseCallback(delayTimeMs: Int) {
+        // acks = 0
+        // 生产者不关心数据处理的结果，不用返回响应
         if (produceRequest.acks == 0) {
           // no operation needed if producer request.required.acks = 0; however, if there is any error in handling
           // the request, since no response is expected by the producer, the server will close socket server so that
@@ -399,7 +406,9 @@ class KafkaApis(val requestChannel: RequestChannel,
             requestChannel.noOperation(request.processor, request)
           }
         } else {
+          // 向客户端返回响应
           val respHeader = new ResponseHeader(request.header.correlationId)
+          // 封装一个请求体（响应消息）
           val respBody = request.header.apiVersion match {
             case 0 => new ProduceResponse(mergedResponseStatus.asJava)
             case version@(1 | 2) => new ProduceResponse(mergedResponseStatus.asJava, delayTimeMs, version)
@@ -407,7 +416,7 @@ class KafkaApis(val requestChannel: RequestChannel,
             // updating this part of the code to handle it properly.
             case version => throw new IllegalArgumentException(s"Version `$version` of ProduceRequest is not handled. Code must be updated.")
           }
-
+          // 给客户端返回响应
           requestChannel.sendResponse(new RequestChannel.Response(request, new ResponseSend(request.connectionId, respHeader, respBody)))
         }
       }
@@ -415,6 +424,7 @@ class KafkaApis(val requestChannel: RequestChannel,
       // When this callback is triggered, the remote API call has completed
       request.apiRemoteCompleteTimeMs = SystemTime.milliseconds
 
+      // 完成后调用produceResponseCallback回调函数
       quotas.produce.recordAndMaybeThrottle(
         request.session.sanitizedUser,
         request.header.clientId,
@@ -433,6 +443,7 @@ class KafkaApis(val requestChannel: RequestChannel,
       }
 
       // call the replica manager to append messages to the replicas
+      // 把接收到的数据追加到磁盘上面，完成后调用sendResponseCallback回调函数
       replicaManager.appendMessages(
         produceRequest.timeout.toLong,
         produceRequest.acks,

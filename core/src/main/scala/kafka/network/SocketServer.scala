@@ -436,7 +436,7 @@ private[kafka] class Processor(val id: Int,
         processNewResponses()
         // 读取和发送请求的代码都在这个方法完成
         poll()
-        // 用来处理接收到达的请求
+        // 用来处理接收到达的请求，将请求放入公共的requestQueue
         processCompletedReceives()
         // 用来处理发送出去的响应
         processCompletedSends()
