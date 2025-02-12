@@ -353,6 +353,7 @@ class ReplicaManager(val config: KafkaConfig,
       } else {
         // we can respond immediately
         val produceResponseStatus = produceStatus.mapValues(status => status.responseStatus)
+        // 通过调用回调函数，给客户端返回响应结果
         responseCallback(produceResponseStatus)
       }
     } else {
@@ -363,6 +364,7 @@ class ReplicaManager(val config: KafkaConfig,
           topicAndPartition -> new PartitionResponse(Errors.INVALID_REQUIRED_ACKS.code,
             LogAppendInfo.UnknownLogAppendInfo.firstOffset, Message.NoTimestamp)
       }
+      // 通过调用回调函数，给客户端返回响应结果
       responseCallback(responseStatus)
     }
   }
@@ -395,6 +397,7 @@ class ReplicaManager(val config: KafkaConfig,
       BrokerTopicStats.getBrokerAllTopicsStats().totalProduceRequestRate.mark()
 
       // reject appending to internal topics if it is not allowed
+      // 判断是否是kafka内部的Topic: _consumer_offsets
       if (Topic.isInternal(topicPartition.topic) && !internalTopicsAllowed) {
         (topicPartition, LogAppendResult(
           LogAppendInfo.UnknownLogAppendInfo,
@@ -403,6 +406,7 @@ class ReplicaManager(val config: KafkaConfig,
         try {
           val partitionOpt = getPartition(topicPartition.topic, topicPartition.partition)
           val info = partitionOpt match {
+            // 追加到Leader Partition
             case Some(partition) =>
               partition.appendMessagesToLeader(messages.asInstanceOf[ByteBufferMessageSet], requiredAcks)
             case None => throw new UnknownTopicOrPartitionException("Partition %s doesn't exist on %d"

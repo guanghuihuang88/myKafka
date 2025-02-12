@@ -443,7 +443,7 @@ class KafkaApis(val requestChannel: RequestChannel,
       }
 
       // call the replica manager to append messages to the replicas
-      // 把接收到的数据追加到磁盘上面，完成后调用sendResponseCallback回调函数
+      // 服务端通过replicaManager把接收到的数据追加到磁盘上面，完成后调用sendResponseCallback回调函数
       replicaManager.appendMessages(
         produceRequest.timeout.toLong,
         produceRequest.acks,
