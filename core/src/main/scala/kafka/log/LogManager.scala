@@ -53,11 +53,14 @@ class LogManager(val logDirs: Array[File],
   val LockFile = ".lock"
   val InitialTaskDelayMs = 30*1000
   private val logCreationOrDeletionLock = new Object
+  // 一个tp对应一个log
   private val logs = new Pool[TopicAndPartition, Log]()
 
+  // 初始化的时候会执行，根据log.dirs配置创建对应的目录
   createAndValidateLogDirs(logDirs)
   private val dirLocks = lockLogDirs(logDirs)
   private val recoveryPointCheckpoints = logDirs.map(dir => (dir, new OffsetCheckpoint(new File(dir, RecoveryPointCheckpointFile)))).toMap
+  // 初始化的时候会执行
   loadLogs()
 
   // public, so we can access this from kafka.admin.DeleteTopicTest
@@ -76,6 +79,7 @@ class LogManager(val logDirs: Array[File],
    * </ol>
    */
   private def createAndValidateLogDirs(dirs: Seq[File]) {
+    // 判断配置里是否有重复目录
     if(dirs.map(_.getCanonicalPath).toSet.size < dirs.size)
       throw new KafkaException("Duplicate log directory found: " + logDirs.mkString(", "))
     for(dir <- dirs) {
@@ -112,7 +116,9 @@ class LogManager(val logDirs: Array[File],
     val threadPools = mutable.ArrayBuffer.empty[ExecutorService]
     val jobs = mutable.Map.empty[File, Seq[Future[_]]]
 
+    // 遍历所有的目录（log.dirs配置）
     for (dir <- this.logDirs) {
+      // 为每个目录都创建一个线程池（后面肯定是启动线程池里的线程去加载log）
       val pool = Executors.newFixedThreadPool(ioThreads)
       threadPools.append(pool)
 
@@ -139,15 +145,16 @@ class LogManager(val logDirs: Array[File],
 
       val jobsForDir = for {
         dirContent <- Option(dir.listFiles).toList
+        // 目前这里的logDir代表一个分区的目录
         logDir <- dirContent if logDir.isDirectory
       } yield {
         CoreUtils.runnable {
           debug("Loading log '" + logDir.getName + "'")
-
+          // 获取分区信息
           val topicPartition = Log.parseTopicPartitionName(logDir)
           val config = topicConfigs.getOrElse(topicPartition.topic, defaultConfig)
           val logRecoveryPoint = recoveryPoints.getOrElse(topicPartition, 0L)
-
+          // 创建一个log对象
           val current = new Log(logDir, config, logRecoveryPoint, scheduler, time)
           val previous = this.logs.put(topicPartition, current)
 

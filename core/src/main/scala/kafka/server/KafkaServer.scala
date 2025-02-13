@@ -207,6 +207,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = SystemTime, threadNamePr
         notifyClusterListeners(kafkaMetricsReporters ++ reporters.asScala)
 
         /* start log manager */
+        // 初始化并启动LogManager
         logManager = createLogManager(zkUtils.zkClient, brokerState)
         logManager.startup()
 
@@ -633,6 +634,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = SystemTime, threadNamePr
   def boundPort(protocol: SecurityProtocol = SecurityProtocol.PLAINTEXT): Int = socketServer.boundPort(protocol)
 
   private def createLogManager(zkClient: ZkClient, brokerState: BrokerState): LogManager = {
+    // 解析配置文件的参数
     val defaultProps = KafkaServer.copyKafkaConfigToLog(config)
     val defaultLogConfig = LogConfig(defaultProps)
 
@@ -648,7 +650,8 @@ class KafkaServer(val config: KafkaConfig, time: Time = SystemTime, threadNamePr
                                       maxIoBytesPerSecond = config.logCleanerIoMaxBytesPerSecond,
                                       backOffMs = config.logCleanerBackoffMs,
                                       enableCleaner = config.logCleanerEnable)
-    new LogManager(logDirs = config.logDirs.map(new File(_)).toArray,
+    // 创建对象
+    new LogManager(logDirs = config.logDirs.map(new File(_)).toArray,   // server.properties中的log.dirs配置项，生产环境通常对应多个目录
                    topicConfigs = configs,
                    defaultConfig = defaultLogConfig,
                    cleanerConfig = cleanerConfig,
