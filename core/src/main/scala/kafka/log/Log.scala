@@ -337,6 +337,7 @@ class Log(val dir: File,
    * @return Information about the appended messages including the first and last offset.
    */
   def append(messages: ByteBufferMessageSet, assignOffsets: Boolean = true): LogAppendInfo = {
+    // 步骤一，校验数据
     val appendInfo = analyzeAndValidateMessageSet(messages)
 
     // if we have any valid messages, append them to the log
@@ -351,6 +352,7 @@ class Log(val dir: File,
       lock synchronized {
 
         if (assignOffsets) {
+          // 步骤二，分配offset
           // assign offsets to the message set
           val offset = new LongRef(nextOffsetMetadata.messageOffset)
           appendInfo.firstOffset = offset.value
@@ -367,6 +369,7 @@ class Log(val dir: File,
           } catch {
             case e: IOException => throw new KafkaException("Error in validating messages while appending to log '%s'".format(name), e)
           }
+          // 步骤三，获取合法的数据
           validMessages = validateAndOffsetAssignResult.validatedMessages
           appendInfo.maxTimestamp = validateAndOffsetAssignResult.maxTimestamp
           appendInfo.offsetOfMaxTimestamp = validateAndOffsetAssignResult.offsetOfMaxTimestamp
@@ -402,19 +405,22 @@ class Log(val dir: File,
         }
 
         // maybe roll the log if this segment is full
+        // 步骤四，获取一个可用的segment
         val segment = maybeRoll(messagesSize = validMessages.sizeInBytes,
                                 maxTimestampInMessages = appendInfo.maxTimestamp)
 
         // now append to the log
+        // 步骤五，把数据写入segment
         segment.append(firstOffset = appendInfo.firstOffset, largestTimestamp = appendInfo.maxTimestamp,
           offsetOfLargestTimestamp = appendInfo.offsetOfMaxTimestamp, messages = validMessages)
 
         // increment the log end offset
+        // 步骤六：更新LEO（lastOffset+1）
         updateLogEndOffset(appendInfo.lastOffset + 1)
 
         trace("Appended message set to log %s with first offset: %d, next offset: %d, and messages: %s"
           .format(this.name, appendInfo.firstOffset, nextOffsetMetadata.messageOffset, validMessages))
-
+        // 步骤七，根据条件判断，把内存数据写入磁盘（默认条件不满足，kafka不主动写磁盘，交给OS定时刷写磁盘）
         if (unflushedMessages >= config.flushInterval)
           flush()
 
