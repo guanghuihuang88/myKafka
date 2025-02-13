@@ -209,6 +209,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = SystemTime, threadNamePr
         /* start log manager */
         // 初始化并启动LogManager
         logManager = createLogManager(zkUtils.zkClient, brokerState)
+        // 启动LogManager
         logManager.startup()
 
         /* generate brokerId */

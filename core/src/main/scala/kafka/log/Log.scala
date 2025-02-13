@@ -673,12 +673,15 @@ class Log(val dir: File,
     */
   def deleteOldSegments(): Int = {
     if (!config.delete) return 0
+    // 根据保存时间和文件大小限制删除segment（生产环境一般不限制文件大小）
     deleteRetenionMsBreachedSegments() + deleteRetentionSizeBreachedSegments()
   }
 
   private def deleteRetenionMsBreachedSegments() : Int = {
     if (config.retentionMs < 0) return 0
     val startMs = time.milliseconds
+    // 若当前时间 - segment最大时间戳 > 保存时间，则删除该segment
+    // 默认删除超过7天的segment文件
     deleteOldSegments(startMs - _.largestTimestamp > config.retentionMs)
   }
 
@@ -819,8 +822,10 @@ class Log(val dir: File,
       return
     debug("Flushing log '" + name + " up to offset " + offset + ", last flushed: " + lastFlushTime + " current time: " +
           time.milliseconds + " unflushed = " + unflushedMessages)
-    for(segment <- logSegments(this.recoveryPoint, offset))
+    for(segment <- logSegments(this.recoveryPoint, offset)) {
+      // segment写磁盘
       segment.flush()
+    }
     lock synchronized {
       if(offset > this.recoveryPoint) {
         this.recoveryPoint = offset

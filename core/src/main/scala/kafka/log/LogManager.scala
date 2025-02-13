@@ -191,20 +191,24 @@ class LogManager(val logDirs: Array[File],
    *  Start the background threads to flush logs and do log cleanup
    */
   def startup() {
+    // 定时调度了3个任务
     /* Schedule the cleanup task to delete old logs */
     if(scheduler != null) {
       info("Starting log cleanup with a period of %d ms.".format(retentionCheckMs))
+      // 定时检查文件，清理超时的文件
       scheduler.schedule("kafka-log-retention",
                          cleanupLogs,
                          delay = InitialTaskDelayMs,
                          period = retentionCheckMs,
                          TimeUnit.MILLISECONDS)
       info("Starting log flusher with a default period of %d ms.".format(flushCheckMs))
+      // 定时把内存里的数据写到磁盘
       scheduler.schedule("kafka-log-flusher", 
                          flushDirtyLogs, 
                          delay = InitialTaskDelayMs, 
                          period = flushCheckMs, 
                          TimeUnit.MILLISECONDS)
+      // 定时更新一个checkpoint文件，服务于kafka重启后的数据恢复
       scheduler.schedule("kafka-recovery-point-checkpoint",
                          checkpointRecoveryPointOffsets,
                          delay = InitialTaskDelayMs,
@@ -433,6 +437,7 @@ class LogManager(val logDirs: Array[File],
     val startMs = time.milliseconds
     for(log <- allLogs; if !log.config.compact) {
       debug("Garbage collecting '" + log.name + "'")
+      // 删除超时文件（kafka对topic数据有保存时间，超时即删除）
       total += log.deleteOldSegments()
     }
     debug("Log cleanup completed. " + total + " files deleted in " +
@@ -469,6 +474,9 @@ class LogManager(val logDirs: Array[File],
         val timeSinceLastFlush = time.milliseconds - log.lastFlushTime
         debug("Checking if flush is needed on " + topicAndPartition.topic + " flush interval  " + log.config.flushMs +
               " last flushed " + log.lastFlushTime + " time since last flush: " + timeSinceLastFlush)
+        // 按照一定频率刷写磁盘
+        // 但是可以发现这个频率的阈值，kafka给的是long的最大值，这意味着kafka不会主动将内存的数据落盘，而是交由OS完成
+        // 当然也可以自己配置flush.ms
         if(timeSinceLastFlush >= log.config.flushMs)
           log.flush
       } catch {
