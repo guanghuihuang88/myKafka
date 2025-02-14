@@ -351,6 +351,7 @@ class FileMessageSet private[kafka](@volatile var file: File,
    * Append these messages to the message set
    */
   def append(messages: ByteBufferMessageSet) {
+    // 写数据的方法
     val written = messages.writeFullyTo(channel)
     _size.getAndAdd(written)
   }
