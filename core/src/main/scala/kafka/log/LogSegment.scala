@@ -94,6 +94,7 @@ class LogSegment(val log: FileMessageSet,
       if (physicalPosition == 0)
         rollingBasedTimestamp = Some(largestTimestamp)
       // append the messages
+      // 写数据到log文件（内存缓冲区，一般由OS落盘）
       log.append(messages)
       // Update the in memory max timestamp and corresponding offset.
       if (largestTimestamp > maxTimestampSoFar) {
@@ -101,9 +102,12 @@ class LogSegment(val log: FileMessageSet,
         offsetOfMaxTimestamp = offsetOfLargestTimestamp
       }
       // append an entry to the index (if needed)
+      // 写数据到index文件（内存缓冲区，一般由OS落盘）
+      // 默认每写4096字节，更新一条索引
       if(bytesSinceLastIndexEntry > indexIntervalBytes) {
         index.append(firstOffset, physicalPosition)
         timeIndex.maybeAppend(maxTimestampSoFar, offsetOfMaxTimestamp)
+        // 写完一条索引，重置bytesSinceLastIndexEntry
         bytesSinceLastIndexEntry = 0
       }
       bytesSinceLastIndexEntry += messages.sizeInBytes

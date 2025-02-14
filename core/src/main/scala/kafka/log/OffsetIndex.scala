@@ -123,7 +123,10 @@ class OffsetIndex(file: File, baseOffset: Long, maxIndexSize: Int = -1)
       require(!isFull, "Attempt to append to a full index (size = " + _entries + ").")
       if (_entries == 0 || offset > _lastOffset) {
         debug("Adding index entry %d => %d to %s.".format(offset, position, file.getName))
+        // 写索引时，先记录逻辑位置，后记录物理位置
+        // NIO offset：逻辑位置
         mmap.putInt((offset - baseOffset).toInt)
+        // 物理位置
         mmap.putInt(position)
         _entries += 1
         _lastOffset = offset
