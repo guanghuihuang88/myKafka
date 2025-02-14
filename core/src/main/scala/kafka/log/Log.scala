@@ -104,6 +104,8 @@ class Log(val dir: File,
   }
   val t = time.milliseconds
   /* the actual segments of the log */
+  // 这是跳表实现的一个并发安全的Map集合，文件名作为 key（base offset），value 是一个 segment
+  // 目的是为了能根据offset的大小快速定位到segment
   private val segments: ConcurrentNavigableMap[java.lang.Long, LogSegment] = new ConcurrentSkipListMap[java.lang.Long, LogSegment]
   loadSegments()
 
