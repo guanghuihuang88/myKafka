@@ -103,9 +103,9 @@ object Message {
 /**
  * A message. The format of an N byte message is the following:
  *
- * 1. 4 byte CRC32 of the message
- * 2. 1 byte "magic" identifier to allow format changes, value is 0 or 1
- * 3. 1 byte "attributes" identifier to allow annotations on the message independent of the version
+ * 1. 4 byte CRC32 of the message    CRC校验码
+ * 2. 1 byte "magic" identifier to allow format changes, value is 0 or 1    0表示绝对offset，1表示相对offset
+ * 3. 1 byte "attributes" identifier to allow annotations on the message independent of the version    属性
  *    bit 0 ~ 2 : Compression codec.
  *      0 : no compression
  *      1 : gzip
@@ -115,11 +115,11 @@ object Message {
  *      0 : create time
  *      1 : log append time
  *    bit 4 ~ 7 : reserved
- * 4. (Optional) 8 byte timestamp only if "magic" identifier is greater than 0
- * 5. 4 byte key length, containing length K
- * 6. K byte key
- * 7. 4 byte payload length, containing length V
- * 8. V byte payload
+ * 4. (Optional) 8 byte timestamp only if "magic" identifier is greater than 0     可选项：时间戳
+ * 5. 4 byte key length, containing length K    消息key的长度
+ * 6. K byte key    消息key的值
+ * 7. 4 byte payload length, containing length V    消息value的长度
+ * 8. V byte payload    消息value值
  *
  * Default constructor wraps an existing ByteBuffer with the Message object with no change to the contents.
  * @param buffer the byte buffer of this message.
