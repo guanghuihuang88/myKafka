@@ -198,6 +198,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = SystemTime, threadNamePr
         kafkaScheduler.startup()
 
         /* setup zookeeper */
+        // 初始化Zookeeper
         zkUtils = initZk()
 
         /* Get or create cluster_id */
@@ -229,6 +230,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = SystemTime, threadNamePr
         replicaManager.startup()
 
         /* start kafka controller */
+        // 初始化并启动Controller，从集群broker1,broker2,broker3...中选举出一个作为Controller节点，管理整个Kafka集群
         kafkaController = new KafkaController(config, zkUtils, brokerState, kafkaMetricsTime, metrics, threadNamePrefix)
         kafkaController.startup()
 
@@ -330,6 +332,7 @@ class KafkaServer(val config: KafkaConfig, time: Time = SystemTime, threadNamePr
       zkClientForChrootCreation.zkClient.close()
     }
 
+    // 初始化好了一个ZK工具类
     val zkUtils = ZkUtils(config.zkConnect,
                           config.zkSessionTimeoutMs,
                           config.zkConnectionTimeoutMs,

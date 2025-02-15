@@ -46,12 +46,15 @@ class ZookeeperLeaderElector(controllerContext: ControllerContext,
 
   def startup {
     inLock(controllerContext.controllerLock) {
+      // 对zk上的某个目录注册监听器
       controllerContext.zkUtils.zkClient.subscribeDataChanges(electionPath, leaderChangeListener)
+      // 选举
       elect
     }
   }
 
   private def getControllerID(): Int = {
+    // 从zk目录中获取ControllerId
     controllerContext.zkUtils.readDataMaybeNull(electionPath)._1 match {
        case Some(controller) => KafkaController.parseControllerId(controller)
        case None => -1
@@ -61,7 +64,8 @@ class ZookeeperLeaderElector(controllerContext: ControllerContext,
   def elect: Boolean = {
     val timestamp = SystemTime.milliseconds.toString
     val electString = Json.encode(Map("version" -> 1, "brokerid" -> brokerId, "timestamp" -> timestamp))
-   
+
+    // 获取集群Controller，如果是第一次启动，则为-1
    leaderId = getControllerID 
     /* 
      * We can get here during the initial startup and the handleDeleted ZK callback. Because of the potential race condition, 
@@ -70,17 +74,21 @@ class ZookeeperLeaderElector(controllerContext: ControllerContext,
      */
     if(leaderId != -1) {
        debug("Broker %d has been elected as leader, so stopping the election process.".format(leaderId))
+      // 如果集群存在Controller，则返回当前broker是否为Controller
        return amILeader
     }
 
     try {
+      // 创建一个electionPath目录，在目录中写入自己的信息
       val zkCheckedEphemeral = new ZKCheckedEphemeral(electionPath,
                                                       electString,
                                                       controllerContext.zkUtils.zkConnection.getZookeeper,
                                                       JaasUtils.isZkSecurityEnabled())
       zkCheckedEphemeral.create()
       info(brokerId + " successfully elected as leader")
+      // 如果创建成功，则当前broker为集群Controller
       leaderId = brokerId
+      // 当一个Controller被选举出来以后，就会执行这个传入的参数函数（onControllerFailover）
       onBecomingLeader()
     } catch {
       case e: ZkNodeExistsException =>

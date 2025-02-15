@@ -326,6 +326,8 @@ class KafkaController(val config : KafkaConfig, zkUtils: ZkUtils, val brokerStat
       // increment the controller epoch
       incrementControllerEpoch(zkUtils.zkClient)
       // before reading source of truth from zookeeper, register the listeners to get broker/topic callbacks
+      // Controller注册各种监听器，监听zk目录变化
+      // 集群的Controller一旦被选举出来，第一件事就是在zk各种目录上设置监听器，Controller就是通过监听这些目录的变化，来管理集群
       registerReassignedPartitionsListener()
       registerIsrChangeNotificationListener()
       registerPreferredReplicaElectionListener()
@@ -671,8 +673,10 @@ class KafkaController(val config : KafkaConfig, zkUtils: ZkUtils, val brokerStat
   def startup() = {
     inLock(controllerContext.controllerLock) {
       info("Controller starting up")
+      // 注册一个监听器
       registerSessionExpirationListener()
       isRunning = true
+      // broker一启动，就会启动zk选举
       controllerElector.startup
       info("Controller startup complete")
     }
