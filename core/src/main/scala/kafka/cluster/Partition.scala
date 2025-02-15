@@ -236,9 +236,11 @@ class Partition(val topic: String,
   def updateReplicaLogReadResult(replicaId: Int, logReadResult: LogReadResult) {
     getReplica(replicaId) match {
       case Some(replica) =>
+        // 更新LEO
         replica.updateLogReadResult(logReadResult)
         // check if we need to expand ISR to include this replica
         // if it is not in the ISR yet
+        // 可能更新ISR
         maybeExpandIsr(replicaId)
 
         debug("Recorded replica %d log end offset (LEO) position %d for partition %s."
@@ -266,8 +268,13 @@ class Partition(val topic: String,
       // check if this replica needs to be added to the ISR
       leaderReplicaIfLocal() match {
         case Some(leaderReplica) =>
+          // 获取到所有的replica
           val replica = getReplica(replicaId).get
+          // 获取到leader partition的hw值
           val leaderHW = leaderReplica.highWatermark
+          // 判断是否更新ISR列表
+
+          // 如果这个replica目前不在ISR列表，其LEO值要比leader partition的HW值大，则将其加入ISR列表
           if(!inSyncReplicas.contains(replica) &&
              assignedReplicas.map(_.brokerId).contains(replicaId) &&
                   replica.logEndOffset.offsetDiff(leaderHW) >= 0) {
@@ -276,12 +283,14 @@ class Partition(val topic: String,
                          .format(topic, partitionId, inSyncReplicas.map(_.brokerId).mkString(","),
                                  newInSyncReplicas.map(_.brokerId).mkString(",")))
             // update ISR in ZK and cache
+            // 更新ISR列表
             updateIsr(newInSyncReplicas)
             replicaManager.isrExpandRate.mark()
           }
 
           // check if the HW of the partition can now be incremented
           // since the replica maybe now be in the ISR and its LEO has just incremented
+          // 可能更新HW值：min(p0-leo,p1-leo,p2-leo)
           maybeIncrementLeaderHW(leaderReplica)
 
         case None => false // nothing to do if no longer leader
