@@ -41,6 +41,9 @@ import org.apache.kafka.common.internals.PartitionStates
 
 /**
  *  Abstract class for fetching data from multiple partitions from the same broker.
+ *
+ *  模版设计模式：
+ *  定义一个操作中的算法的框架，而将一些步骤延迟到子类中，使得一个子类可以不改变算法的结构即可重新定义该算法的某些特定步骤
  */
 abstract class AbstractFetcherThread(name: String,
                                      clientId: String,

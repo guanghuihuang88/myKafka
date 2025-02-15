@@ -235,6 +235,7 @@ class ReplicaFetcherThread(name: String,
   }
 
   protected def fetch(fetchRequest: FetchRequest): Seq[(TopicPartition, PartitionData)] = {
+    // 发送请求，ApiKeys.FETCH
     val clientResponse = sendRequest(ApiKeys.FETCH, Some(fetchRequestVersion), fetchRequest.underlying)
     new FetchResponse(clientResponse.responseBody).responseData.asScala.toSeq.map { case (key, value) =>
       key -> new PartitionData(value)
@@ -249,7 +250,9 @@ class ReplicaFetcherThread(name: String,
         throw new SocketTimeoutException(s"Failed to connect within $socketTimeout ms")
       else {
         val send = new RequestSend(sourceBroker.id.toString, header, request.toStruct)
+        // 发送请求之前，最后把请求封装成ClientRequest对象
         val clientRequest = new ClientRequest(time.milliseconds(), true, send, null)
+        // 把请求发送出去
         networkClient.blockingSendAndReceive(clientRequest)(time)
       }
     }
