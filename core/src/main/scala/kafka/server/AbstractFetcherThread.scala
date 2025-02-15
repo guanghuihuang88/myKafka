@@ -90,6 +90,7 @@ abstract class AbstractFetcherThread(name: String,
   override def doWork() {
 
     val fetchRequest = inLock(partitionMapLock) {
+      // 构建请求
       val fetchRequest = buildFetchRequest(partitionStates.partitionStates.asScala.map { state =>
         state.topicPartition -> state.value
       })
@@ -99,8 +100,10 @@ abstract class AbstractFetcherThread(name: String,
       }
       fetchRequest
     }
-    if (!fetchRequest.isEmpty)
+    if (!fetchRequest.isEmpty) {
+      // 对请求进行处理
       processFetchRequest(fetchRequest)
+    }
   }
 
   private def processFetchRequest(fetchRequest: REQ) {
@@ -115,6 +118,7 @@ abstract class AbstractFetcherThread(name: String,
 
     try {
       trace("Issuing to broker %d of fetch request %s".format(sourceBroker.id, fetchRequest))
+      // 这里向leader所在broker发起fetch请求
       responseData = fetch(fetchRequest)
     } catch {
       case t: Throwable =>
