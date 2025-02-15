@@ -540,7 +540,7 @@ class Log(val dir: File,
     val next = currentNextOffsetMetadata.messageOffset
     if(startOffset == next)
       return FetchDataInfo(currentNextOffsetMetadata, MessageSet.Empty)
-
+    // 获取segment对象
     var entry = segments.floorEntry(startOffset)
 
     // attempt to read beyond the log end offset is an error
@@ -568,6 +568,7 @@ class Log(val dir: File,
           entry.getValue.size
         }
       }
+      // 核心：通过segment读取数据
       val fetchInfo = entry.getValue.read(startOffset, maxOffset, maxLength, maxPosition, minOneMessage)
       if(fetchInfo == null) {
         entry = segments.higherEntry(entry.getKey)

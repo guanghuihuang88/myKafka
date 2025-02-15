@@ -457,6 +457,7 @@ class ReplicaManager(val config: KafkaConfig,
   /**
    * Fetch messages from the leader replica, and wait until enough data can be fetched and return;
    * the callback function will be triggered either when timeout or required fetch info is satisfied
+   * 从Leader Partition拉取数据
    */
   def fetchMessages(timeout: Long,
                     replicaId: Int,
@@ -471,6 +472,7 @@ class ReplicaManager(val config: KafkaConfig,
     val fetchOnlyCommitted: Boolean = ! Request.isValidBrokerId(replicaId)
 
     // read from local logs
+    // 从本地磁盘读取log
     val logReadResults = readFromLocalLog(
       replicaId = replicaId,
       fetchOnlyFromLeader = fetchOnlyFromLeader,
@@ -546,6 +548,7 @@ class ReplicaManager(val config: KafkaConfig,
           (if (minOneMessage) s", ignoring response/partition size limits" else ""))
 
         // decide whether to only fetch from leader
+        // 获取leader partition
         val localReplica = if (fetchOnlyFromLeader)
           getLeaderReplicaIfLocal(topic, partition)
         else
@@ -569,6 +572,7 @@ class ReplicaManager(val config: KafkaConfig,
             val adjustedFetchSize = math.min(fetchSize, limitBytes)
 
             // Try the read first, this tells us whether we need all of adjustedFetchSize for this partition
+            // 通过log对象读取数据（容易知道后续应该是通过logsegment读取）
             val fetch = log.read(offset, adjustedFetchSize, maxOffsetOpt, minOneMessage)
 
             // If the partition is being throttled, simply return an empty set.
@@ -607,7 +611,9 @@ class ReplicaManager(val config: KafkaConfig,
     var limitBytes = fetchMaxBytes
     val result = new mutable.ArrayBuffer[(TopicAndPartition, LogReadResult)]
     var minOneMessage = !hardMaxBytesLimit
+    // 一个分区一个分区读取
     readPartitionInfo.foreach { case (tp, fetchInfo) =>
+      // 读取数据
       val readResult = read(tp, fetchInfo, limitBytes, minOneMessage)
       val messageSetSize = readResult.info.messageSet.sizeInBytes
       // Once we read from a non-empty partition, we stop ignoring request and partition level size limits

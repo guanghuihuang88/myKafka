@@ -189,7 +189,7 @@ class LogSegment(val log: FileMessageSet,
             mapping._1.position
         min(min(maxPosition, endPosition) - startPosition.position, adjustedMaxSize).toInt
     }
-
+    // 最后通过segment里的log数据文件读取（segment包括log和index两种文件）
     FetchDataInfo(offsetMetadata, log.read(startPosition.position, length),
       firstMessageSetIncomplete = adjustedMaxSize < messageSetSize)
   }
