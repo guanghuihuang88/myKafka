@@ -356,10 +356,15 @@ class ReplicaStateMachine(controller: KafkaController) extends Logging {
         if (hasStarted.get) {
           ControllerStats.leaderElectionTimer.time {
             try {
+              // 获取到所有的broker
               val curBrokers = currentBrokerList.map(_.toInt).toSet.flatMap(zkUtils.getBrokerInfo)
+              // 获取到所有broker的id号
               val curBrokerIds = curBrokers.map(_.id)
+              // 获取到所有live的broker
               val liveOrShuttingDownBrokerIds = controllerContext.liveOrShuttingDownBrokerIds
+              // 获取新加入的broker
               val newBrokerIds = curBrokerIds -- liveOrShuttingDownBrokerIds
+              // 获取宕机的broker
               val deadBrokerIds = liveOrShuttingDownBrokerIds -- curBrokerIds
               val newBrokers = curBrokers.filter(broker => newBrokerIds(broker.id))
               controllerContext.liveBrokers = curBrokers
@@ -370,10 +375,15 @@ class ReplicaStateMachine(controller: KafkaController) extends Logging {
                 .format(newBrokerIdsSorted.mkString(","), deadBrokerIdsSorted.mkString(","), liveBrokerIdsSorted.mkString(",")))
               newBrokers.foreach(controllerContext.controllerChannelManager.addBroker)
               deadBrokerIds.foreach(controllerContext.controllerChannelManager.removeBroker)
-              if(newBrokerIds.nonEmpty)
+              // 这里不为空，则说明有新的broker注册进来
+              if(newBrokerIds.nonEmpty) {
+                // Controller处理新注册的broker
                 controller.onBrokerStartup(newBrokerIdsSorted)
-              if(deadBrokerIds.nonEmpty)
+              }
+              if(deadBrokerIds.nonEmpty) {
+                // 处理宕机的broker
                 controller.onBrokerFailure(deadBrokerIdsSorted)
+              }
             } catch {
               case e: Throwable => error("Error while handling broker changes", e)
             }
