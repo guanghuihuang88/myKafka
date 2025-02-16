@@ -88,6 +88,7 @@ object TopicCommand extends Logging {
       allTopics
   }
 
+  // 从kafka-topics.sh脚本中可以追溯到创建Topic使用的这个方法
   def createTopic(zkUtils: ZkUtils, opts: TopicCommandOptions) {
     val topic = opts.options.valueOf(opts.topicOpt)
     val configs = parseTopicConfigsToBeAdded(opts)
@@ -96,7 +97,9 @@ object TopicCommand extends Logging {
       println("WARNING: Due to limitations in metric names, topics with a period ('.') or underscore ('_') could collide. To avoid issues it is best to use either, but not both.")
     try {
       if (opts.options.has(opts.replicaAssignmentOpt)) {
+        // 获取到分配方案
         val assignment = parseReplicaAssignment(opts.options.valueOf(opts.replicaAssignmentOpt))
+        // 把分配方案写到zk
         AdminUtils.createOrUpdateTopicPartitionAssignmentPathInZK(zkUtils, topic, assignment, configs, update = false)
       } else {
         CommandLineUtils.checkRequiredArgs(opts.parser, opts.options, opts.partitionsOpt, opts.replicationFactorOpt)

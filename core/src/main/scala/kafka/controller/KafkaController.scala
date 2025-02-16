@@ -331,10 +331,10 @@ class KafkaController(val config : KafkaConfig, zkUtils: ZkUtils, val brokerStat
       registerReassignedPartitionsListener()
       registerIsrChangeNotificationListener()
       registerPreferredReplicaElectionListener()
-      partitionStateMachine.registerListeners()
-      replicaStateMachine.registerListeners()
+      partitionStateMachine.registerListeners()   // 监听集群中partition分区变化
+      replicaStateMachine.registerListeners()    // 监听集群中的broker变化
       initializeControllerContext()
-      replicaStateMachine.startup()  // 监听集群中的broker变化
+      replicaStateMachine.startup()
       partitionStateMachine.startup()
       // register the partition change listeners for all existing topics on failover
       controllerContext.allTopics.foreach(topic => partitionStateMachine.registerPartitionChangeListener(topic))
@@ -506,6 +506,7 @@ class KafkaController(val config : KafkaConfig, zkUtils: ZkUtils, val brokerStat
     info("New topic creation callback for %s".format(newPartitions.mkString(",")))
     // subscribe to partition changes
     topics.foreach(topic => partitionStateMachine.registerPartitionChangeListener(topic))
+    // 新partition的创建
     onNewPartitionCreation(newPartitions)
   }
 
@@ -520,6 +521,7 @@ class KafkaController(val config : KafkaConfig, zkUtils: ZkUtils, val brokerStat
     partitionStateMachine.handleStateChanges(newPartitions, NewPartition)
     replicaStateMachine.handleStateChanges(controllerContext.replicasForPartition(newPartitions), NewReplica)
     partitionStateMachine.handleStateChanges(newPartitions, OnlinePartition, offlinePartitionSelector)
+    // 发送更新副本元数据的网络请求
     replicaStateMachine.handleStateChanges(controllerContext.replicasForPartition(newPartitions), OnlineReplica)
   }
 

@@ -74,6 +74,7 @@ class PartitionStateMachine(controller: KafkaController) extends Logging {
 
   // register topic and partition change listeners
   def registerListeners() {
+    // 监听/brokers/topics
     registerTopicChangeListener()
     if(controller.config.deleteTopicEnable)
       registerDeleteTopicListener()
@@ -425,15 +426,17 @@ class PartitionStateMachine(controller: KafkaController) extends Logging {
             val newTopics = currentChildren -- controllerContext.allTopics
             val deletedTopics = controllerContext.allTopics -- currentChildren
             controllerContext.allTopics = currentChildren
-
+            // 从zk里面读取topic分配方案
             val addedPartitionReplicaAssignment = zkUtils.getReplicaAssignmentForTopics(newTopics.toSeq)
             controllerContext.partitionReplicaAssignment = controllerContext.partitionReplicaAssignment.filter(p =>
               !deletedTopics.contains(p._1.topic))
             controllerContext.partitionReplicaAssignment.++=(addedPartitionReplicaAssignment)
             info("New topics: [%s], deleted topics: [%s], new partition replica assignment [%s]".format(newTopics,
               deletedTopics, addedPartitionReplicaAssignment))
-            if(newTopics.nonEmpty)
+            if(newTopics.nonEmpty) {
+              // 新topic的创建
               controller.onNewTopicCreation(newTopics, addedPartitionReplicaAssignment.keySet.toSet)
+            }
           } catch {
             case e: Throwable => error("Error while handling new topic", e )
           }
